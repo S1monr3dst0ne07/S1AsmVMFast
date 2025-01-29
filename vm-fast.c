@@ -20,51 +20,59 @@ typedef uint16_t vint_t;
 #define LABEL_MAPPER_SIZE 2048
 
 
+#define render_opcode_list(f) \
+    f(invalid) \
+    f(set) \
+    f(add) \
+    f(sub) \
+    f(shg) \
+    f(shs) \
+    f(lor) \
+    f(and) \
+    f(xor) \
+    f(not) \
+    f(lDA) \
+    f(lDR) \
+    f(sAD) \
+    f(sRD) \
+    f(lPA) \
+    f(lPR) \
+    f(sAP) \
+    f(sRP) \
+    f(out) \
+    f(inp) \
+    f(got) \
+    f(jm0) \
+    f(jmA) \
+    f(jmG) \
+    f(jmL) \
+    f(jmS) \
+    f(ret) \
+    f(pha) \
+    f(pla) \
+    f(brk) \
+    f(clr) \
+    f(putstr) \
+    f(ahm) \
+    f(fhm) \
 
-enum opcode_t
-{
-    invalid = 0,
-    set,
-    add,
-    sub,
-    shg,
-    shs,
-    lor,
-    and,
-    xor,
-    not,
-    lDA,
-    lDR,
-    sAD,
-    sRD,
-    lPA,
-    lPR,
-    sAP,
-    sRP,
-    out,
-    inp,
-    got,
-    jm0,
-    jmA,
-    jmG,
-    jmL,
-    jmS,
-    ret,
-    pha,
-    pla,
-    brk,
-    clr,
-    putstr,
-    ahm,
-    fhm,
-};
+#define render_enum(x) x,
+#define render_mapper(x) { x, #x }, 
+
+
+enum opcode_t { render_opcode_list(render_enum) };
+struct {
+    enum opcode_t operation;
+    char* string;
+} opcodeMapper[] = { render_opcode_list(render_mapper) };
+    
 
 
 typedef struct 
 {
     //parsed command
-    char* operOriginal;
-    char* attrOriginal;
+    char* operSource;
+    char* attrSource;
 
     //resolved command
     enum opcode_t operation;
@@ -75,6 +83,7 @@ typedef struct
 } inst_t;
 
 inst_t prog[PROG_SIZE] = { 0 };
+vint_t progSize = 0;
 
 
 
@@ -166,7 +175,6 @@ void parse()
     char* attribute = NULL;
 
     vint_t line      = 0;
-    vint_t progIndex = 0;
 
     while (c = peekSource())
     switch (state)
@@ -218,17 +226,17 @@ void parse()
             if (!strcmp(operation, "lab"))
             {
                 labelMapper[labelMapperSize].label = attribute;
-                labelMapper[labelMapperSize].index = progIndex;
+                labelMapper[labelMapperSize].index = progSize;
 
                 labelMapperSize++;
             }
             else
             {  
-                prog[progIndex].operOriginal = operation;
-                prog[progIndex].attrOriginal = attribute;
-                prog[progIndex].sourceOriginLine = line;
+                prog[progSize].operSource = operation;
+                prog[progSize].attrSource = attribute;
+                prog[progSize].sourceOriginLine = line;
 
-                progIndex++;
+                progSize++;
             }
 
             state = PARSE_INIT;
@@ -240,11 +248,26 @@ void parse()
             nextSource();
             break;
     }
-
-
-
 }
 
+
+enum opcode_t operationLoopup(char* operation)
+{
+    
+}
+
+
+
+
+void resolve()
+{
+    for (int i = 0; i < progSize; i++)
+    {
+        
+    }
+    
+
+}
 
 
 
@@ -252,9 +275,10 @@ int main(int argc, char** argv)
 {
     char* path = argc > 1 ? argv[1] : "build.s1";
     loadSource(path);
+
     parse();
+    resolve();
 
 
-    printf("%s\n", sourceBuffer);
 }
 
