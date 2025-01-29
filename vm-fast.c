@@ -11,7 +11,7 @@ typedef uint16_t vint_t;
 
 
 #define INT_LIMIT  (1 << (sizeof(vint_t)*8 - 1))
-#define PROG_SIZE  INT_LIMIT
+#define PROG_SIZE  (INT_LIMIT * 30)
 #define MEM_SIZE   INT_LIMIT
 #define STACK_SIZE INT_LIMIT
 
