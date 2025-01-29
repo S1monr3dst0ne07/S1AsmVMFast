@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <string.h>
 
 
 
@@ -14,9 +15,8 @@ typedef uint16_t vint_t;
 #define SOURCE_SIZE  (INT_LIMIT * 30)
 #define MEM_SIZE     INT_LIMIT
 #define STACK_SIZE   INT_LIMIT
-#define PROG_SIZE   INT_LIMIT
+#define PROG_SIZE    INT_LIMIT
 
-#define GEN_BUFFER_SIZE 2048
 #define LABEL_MAPPER_SIZE 2048
 
 
@@ -62,19 +62,19 @@ enum opcode_t
 
 typedef struct 
 {
-    //original command
-    char instOriginal[GEN_BUFFER_SIZE];
-    char attrOriginal[GEN_BUFFER_SIZE];
-
     //parsed command
+    char* operOriginal;
+    char* attrOriginal;
+
+    //resolved command
     enum opcode_t operation;
     vint_t        attribute;
 
     //error feedback
-    int sourceOriginLine;
+    vint_t sourceOriginLine;
 } inst_t;
 
-//inst_t prog[
+inst_t prog[PROG_SIZE] = { 0 };
 
 
 
@@ -93,7 +93,7 @@ struct _label_map
     char* label;
     vint_t index;
 } labelMapper[LABEL_MAPPER_SIZE] = { 0 };
-
+vint_t labelMapperSize = 0;
 
 
 
@@ -104,7 +104,12 @@ struct _label_map
 
 
 char sourceBuffer[SOURCE_SIZE] = { 0 };
+char* sourcePtr = sourceBuffer;
 
+char  peekSource()  { return *sourcePtr;   }
+void  nextSource()  {         sourcePtr++; }
+char  popSource()   { return *sourcePtr++; }
+char* indexSource() { return  sourcePtr;   }
 
 
 bool isNumber(char*s )
@@ -138,11 +143,116 @@ void loadSource(char* path)
 
 
 
+void parse()
+{
+    enum parse_state_t
+    {
+        PARSE_INIT,
+        PARSE_PRE,
+        PARSE_INIT_OP,
+        PARSE_OP,
+        PARSE_FINAL_OP,
+        PARSE_INIT_AT,
+        PARSE_AT,
+        PARSE_FINAL_AT,
+        PARSE_FINAL,
+
+        PARSE_COMMENT,
+    } state = PARSE_PRE;
+
+    char c;
+
+    char* operation = NULL;
+    char* attribute = NULL;
+
+    vint_t line      = 0;
+    vint_t progIndex = 0;
+
+    while (c = peekSource())
+    switch (state)
+    {
+        case PARSE_INIT:
+            line++;
+            state = PARSE_PRE;
+            break;
+
+        case PARSE_PRE:
+            /**/ if (c == '"') state = PARSE_COMMENT;
+            else if (c != ' ') state = PARSE_INIT_OP;
+            else nextSource();
+            break;
+
+        case PARSE_INIT_OP:
+            operation = indexSource();
+            state = PARSE_OP;
+            break;
+
+        case PARSE_OP:
+            if (c != ' ') nextSource();
+            else state = PARSE_FINAL_OP;
+            break;
+
+        case PARSE_FINAL_OP:
+            *indexSource() = '\0';
+            nextSource();
+            state = PARSE_INIT_AT;
+            break;
+
+        case PARSE_INIT_AT:
+            attribute = indexSource();
+            state = PARSE_AT;
+            break;
+
+        case PARSE_AT:
+            if (c != '\n') nextSource();
+            else state = PARSE_FINAL_AT;
+            break;
+
+        case PARSE_FINAL_AT:
+            *indexSource() = '\0';
+            nextSource();
+            state = PARSE_FINAL;
+            break;
+
+        case PARSE_FINAL:
+            if (!strcmp(operation, "lab"))
+            {
+                labelMapper[labelMapperSize].label = attribute;
+                labelMapper[labelMapperSize].index = progIndex;
+
+                labelMapperSize++;
+            }
+            else
+            {  
+                prog[progIndex].operOriginal = operation;
+                prog[progIndex].attrOriginal = attribute;
+                prog[progIndex].sourceOriginLine = line;
+
+                progIndex++;
+            }
+
+            state = PARSE_INIT;
+            break;
+
+
+        case PARSE_COMMENT:
+            if (c == '\n') state = PARSE_INIT;
+            nextSource();
+            break;
+    }
+
+
+
+}
+
+
+
+
 int main(int argc, char** argv)
 {
     char* path = argc > 1 ? argv[1] : "build.s1";
     loadSource(path);
-    //parse();
+    parse();
 
 
     printf("%s\n", sourceBuffer);
