@@ -1,4 +1,8 @@
-
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <ctype.h>
 
 
 
@@ -63,7 +67,7 @@ typedef struct
 
     //parsed command
     enum opcode_t operation;
-    vint          attribute;
+    vint_t        attribute;
 
     //error feedback
     int sourceOriginLine;
@@ -87,7 +91,7 @@ typedef struct _chunk_node
 
 
 
-char* sourceProgBuffer[PROG_SIZE] = { 0 };
+char sourceProgBuffer[PROG_SIZE] = { 0 };
 
 
 
