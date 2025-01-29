@@ -21,7 +21,6 @@ typedef uint16_t vint_t;
 
 
 #define render_opcode_list(f) \
-    f(invalid) \
     f(set) \
     f(add) \
     f(sub) \
@@ -61,10 +60,11 @@ typedef uint16_t vint_t;
 
 
 enum opcode_t { render_opcode_list(render_enum) };
-struct {
+struct _opcode_mapper_entry {
     enum opcode_t operation;
     char* string;
 } opcodeMapper[] = { render_opcode_list(render_mapper) };
+const vint_t opcodeMapperSize = sizeof(opcodeMapper) / sizeof(struct _opcode_mapper_entry);
     
 
 
@@ -109,6 +109,8 @@ vint_t labelMapperSize = 0;
 
 #define panic0(message     ) { printf("Error: %s\n"  , message, arg); exit(1); }
 #define panic1(message, arg) { printf("Error: %s%s\n", message, arg); exit(1); }
+#define line_panic0(line, message     ) { printf("Error on line %d: %s\n"  , line, message, arg); exit(1); }
+#define line_panic1(line, message, arg) { printf("Error on line %d: %s%s\n", line, message, arg); exit(1); }
 
 
 
@@ -251,9 +253,22 @@ void parse()
 }
 
 
-enum opcode_t operationLoopup(char* operation)
+enum opcode_t operationLoopup(inst_t inst)
 {
-    
+    for (int i = 0; i < opcodeMapperSize; i++)
+        if (!strcmp(opcodeMapper[i].string, inst.operSource))
+            return opcodeMapper[i].operation;
+
+    line_panic1(inst.sourceOriginLine, "No such operation: ", inst.operSource); 
+}
+
+vint_t labelLookup(inst_t inst)
+{
+    for (int i = 0; i < labelMapperSize; i++)
+        if (!strcmp(labelMapper[i].label, inst.attrSource))
+            return labelMapper[i].index;
+          
+    line_panic1(inst.sourceOriginLine, "No such label: ", inst.attrSource); 
 }
 
 
@@ -263,10 +278,13 @@ void resolve()
 {
     for (int i = 0; i < progSize; i++)
     {
-        
-    }
-    
+        inst_t* inst = &prog[i];
 
+        inst->operation = operationLoopup(*inst);
+        inst->attribute = isNumber(inst->attrSource)
+            ? atoi(inst->attrSource)
+            : labelLookup(*inst);
+    }
 }
 
 
@@ -279,6 +297,6 @@ int main(int argc, char** argv)
     parse();
     resolve();
 
-
+    
 }
 
