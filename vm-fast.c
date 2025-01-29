@@ -10,12 +10,14 @@
 typedef uint16_t vint_t;
 
 
-#define INT_LIMIT  (1 << (sizeof(vint_t)*8 - 1))
-#define PROG_SIZE  (INT_LIMIT * 30)
-#define MEM_SIZE   INT_LIMIT
-#define STACK_SIZE INT_LIMIT
+#define INT_LIMIT    (1 << (sizeof(vint_t)*8 - 1))
+#define SOURCE_SIZE  (INT_LIMIT * 30)
+#define MEM_SIZE     INT_LIMIT
+#define STACK_SIZE   INT_LIMIT
+#define PROG_SIZE   INT_LIMIT
 
 #define GEN_BUFFER_SIZE 2048
+#define LABEL_MAPPER_SIZE 2048
 
 
 
@@ -41,7 +43,6 @@ enum opcode_t
     sRP,
     out,
     inp,
-    lab,
     got,
     jm0,
     jmA,
@@ -73,6 +74,8 @@ typedef struct
     int sourceOriginLine;
 } inst_t;
 
+//inst_t prog[
+
 
 
 
@@ -85,13 +88,22 @@ typedef struct _chunk_node
 } chunk_node_t;
 
 
+struct _label_map
+{
+    char* label;
+    vint_t index;
+} labelMapper[LABEL_MAPPER_SIZE] = { 0 };
+
+
+
+
 
 #define panic0(message     ) { printf("Error: %s\n"  , message, arg); exit(1); }
 #define panic1(message, arg) { printf("Error: %s%s\n", message, arg); exit(1); }
 
 
 
-char sourceProgBuffer[PROG_SIZE] = { 0 };
+char sourceBuffer[SOURCE_SIZE] = { 0 };
 
 
 
@@ -107,14 +119,14 @@ bool isNumber(char*s )
 
 
 
-void loadSourceProg(char* path)
+void loadSource(char* path)
 {
     FILE* fd = fopen(path, "r");
     if (!fd)
         panic1("No such file: ", path);
 
     char  c;
-    char* p = sourceProgBuffer;
+    char* p = sourceBuffer;
 
     while ((c = fgetc(fd)) != EOF)
         *p++ = c;
@@ -124,12 +136,15 @@ void loadSourceProg(char* path)
 }
 
 
+
+
 int main(int argc, char** argv)
 {
     char* path = argc > 1 ? argv[1] : "build.s1";
-    loadSourceProg(path);
+    loadSource(path);
+    //parse();
 
 
-    printf("%s\n", sourceProgBuffer);
+    printf("%s\n", sourceBuffer);
 }
 
