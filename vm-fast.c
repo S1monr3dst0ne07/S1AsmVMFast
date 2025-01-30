@@ -16,6 +16,7 @@ typedef uint16_t vint_t;
 #define MEM_SIZE     INT_LIMIT
 #define STACK_SIZE   INT_LIMIT
 #define PROG_SIZE    INT_LIMIT
+#define HEAP_START   (INT_LIMIT >> 1)
 
 #define LABEL_MAPPER_SIZE 2048
 
@@ -90,11 +91,50 @@ vint_t progSize = 0;
 
 typedef struct _chunk_node
 {
-    unsigned int ptr;
-    unsigned int size;
+    vint_t ptr;
+    vint_t size;
     struct _chunk_node* next;
     struct _chunk_node* prev;
-} chunk_node_t;
+}* chunk_node_t;
+
+chunk_node_t allocateChunkNode()
+{
+    return malloc(sizeof(struct _chunk_node));
+}
+chunk_node_t scanChunkNode(vint_t requiredSpace, chunk_node_t base)
+{
+    chunk_node_t iter = base; 
+
+    while (iter->next)
+    {
+        vint_t   endPtrCurr = iter->ptr + iter->size;
+        vint_t startPtrNext = iter->next->ptr;
+        vint_t space = startPtrNext - endPtrCurr;
+
+        if ( space >= requiredSpace) break;
+
+        iter = iter->next;
+    }
+
+    return iter;
+}
+chunk_node_t findChunkNodeByPtr(vint_t ptr, chunk_node_t base)
+{
+    chunk_node_t iter = base;
+
+    while (iter)
+    {
+        if (iter->ptr == ptr)
+            return iter;
+
+        iter = iter->next;
+    }
+
+    return NULL;
+}
+
+
+
 
 
 struct _label_map
@@ -109,8 +149,8 @@ vint_t labelMapperSize = 0;
 
 #define panic0(message     ) { printf("Error: %s\n"  , message, arg); exit(1); }
 #define panic1(message, arg) { printf("Error: %s%s\n", message, arg); exit(1); }
-#define line_panic0(line, message     ) { printf("Error on line %d: %s\n"  , line, message, arg); exit(1); }
-#define line_panic1(line, message, arg) { printf("Error on line %d: %s%s\n", line, message, arg); exit(1); }
+#define line_panic0(line, message     ) { printf("Error at address %d: %s\n"  , line, message     ); exit(1); }
+#define line_panic1(line, message, arg) { printf("Error at address %d: %s%s\n", line, message, arg); exit(1); }
 
 
 
@@ -299,6 +339,11 @@ void execute()
     vint_t stack[MEM_SIZE]  = { 0 };
     vint_t stackIndex       = 0;
 
+    chunk_node_t heapBase = allocateChunkNode();
+    heapBase->ptr = HEAP_START;
+    heapBase->size = 0;
+    heapBase->next = NULL;
+
     bool running = true;
 
     for (vint_t execIndex = 0; execIndex < progSize && running; execIndex++)
@@ -356,6 +401,57 @@ void execute()
                 break;
             
             case putstr: printf("%c", (char)acc); fflush(stdout);       break;
+
+            case ahm:;
+                vint_t requiredSpace = reg;
+
+                chunk_node_t prev = scanChunkNode(requiredSpace, heapBase);
+                chunk_node_t next = prev->next;
+                chunk_node_t new  = allocateChunkNode();
+
+                //verify requiredSpace
+                if (prev->ptr + requiredSpace > INT_LIMIT)
+                    line_panic0(inst.sourceOriginLine, "Out of memory");
+
+                vint_t base = prev->ptr + prev->size;
+                
+                //populate new chunk
+                new->ptr = base;
+                new->size = requiredSpace;
+                
+                //link prev to new
+                prev->next = new;
+                new->prev = prev;
+
+                //link new to next
+                new->next = next;
+                if (next) next->prev = new;
+
+                acc = base;
+                break;
+
+            case fhm:;
+                vint_t size = reg;
+                vint_t ptr  = acc;
+
+                chunk_node_t node = findChunkNodeByPtr(ptr, heapBase);
+
+                if (!node)              line_panic1(inst.sourceOriginLine, "(Heap) Tried to free chunk that is already free, at address: ", ptr);
+                if (node->size != size) line_panic0(inst.sourceOriginLine, "(Heap) Chunk size mismatch");
+
+                prev = node->prev;
+                next = node->next;
+
+                //unlink
+                prev->next = next;
+                if (next) next->prev = prev;
+
+                //zero out memory for safety
+                memset(&memory[node->ptr], 0, sizeof(vint_t) * node->size);
+
+                //free
+                free(node);
+                break;
 
         }
     }
