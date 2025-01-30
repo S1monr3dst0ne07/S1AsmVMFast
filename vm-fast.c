@@ -11,7 +11,7 @@
 typedef uint16_t vint_t;
 
 
-#define INT_LIMIT    (1 << (sizeof(vint_t)*8 - 1))
+#define INT_LIMIT    ((1 << (sizeof(vint_t)*8)) - 1)
 #define SOURCE_SIZE  (INT_LIMIT * 30)
 #define MEM_SIZE     INT_LIMIT
 #define STACK_SIZE   INT_LIMIT
@@ -228,7 +228,7 @@ void parse()
             if (!strcmp(operation, "lab"))
             {
                 labelMapper[labelMapperSize].label = attribute;
-                labelMapper[labelMapperSize].index = progSize;
+                labelMapper[labelMapperSize].index = progSize - 1;
 
                 labelMapperSize++;
             }
@@ -289,6 +289,85 @@ void resolve()
 
 
 
+void execute()
+{
+   
+    vint_t acc = 0;
+    vint_t reg = 0;
+
+    vint_t memory[MEM_SIZE] = { 0 };
+    vint_t stack[MEM_SIZE]  = { 0 };
+    vint_t stackIndex       = 0;
+
+    bool running = true;
+
+    for (vint_t execIndex = 0; execIndex < progSize && running; execIndex++)
+    {
+        inst_t inst = prog[execIndex];
+        vint_t attr = inst.attribute;
+
+        switch (inst.operation)
+        {
+            case set: reg = attr;                   break;
+
+            case add: acc += reg;                   break;
+            case sub: acc -= reg;                   break;
+            case shg: acc <<= 1;                    break;
+            case shs: acc >>= 1;                    break;
+            case lor: acc |= reg;                   break;
+            case and: acc &= reg;                   break;
+            case xor: acc ^= reg;                   break;
+            case not: acc = ~acc;                   break;
+
+            case lDA: acc = memory[attr];           break;
+            case lDR: reg = memory[attr];           break;
+            case sAD: memory[attr] = acc;           break;
+            case sRD: memory[attr] = reg;           break;
+
+            case lPA: acc = memory[memory[attr]];   break;
+            case lPR: reg = memory[memory[attr]];   break;
+            case sAP: memory[memory[attr]] = acc;   break;
+            case sRP: memory[memory[attr]] = reg;   break;
+
+            case out: printf("%d\n", memory[attr]); break;
+            case inp:
+                printf(">>>");
+                scanf("%hd", &memory[attr]);
+                break;
+
+            case got: execIndex = attr;                     break;
+            case jm0: if (acc == 0)   execIndex = attr;     break;
+            case jmA: if (acc == reg) execIndex = attr;     break;
+            case jmG: if (acc > reg)  execIndex = attr;     break;
+            case jmL: if (acc < reg)  execIndex = attr;     break;
+            case jmS: 
+                stack[stackIndex++] = execIndex;
+                execIndex = attr;
+                break;
+            case ret: execIndex = stack[--stackIndex];      break;
+
+            case pha: stack[stackIndex++] = acc;                        break;
+            case pla: acc = stackIndex > 0 ? stack[--stackIndex] : 0;   break;
+
+            case brk: running = false;                                  break;
+            case clr:
+                acc = 0;
+                reg = 0;
+                break;
+            
+            case putstr: printf("%c", (char)acc); fflush(stdout);       break;
+
+        }
+    }
+
+
+
+}
+
+
+
+
+
 int main(int argc, char** argv)
 {
     char* path = argc > 1 ? argv[1] : "build.s1";
@@ -297,6 +376,7 @@ int main(int argc, char** argv)
     parse();
     resolve();
 
-    
+
+    execute();    
 }
 
