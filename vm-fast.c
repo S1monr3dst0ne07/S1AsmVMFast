@@ -124,7 +124,10 @@ chunk_node_t findChunkNodeByPtr(vint_t ptr, chunk_node_t base)
 
     while (iter)
     {
-        if (iter->ptr == ptr)
+        //chunks of size zero are ignored,
+        //because they don't take up space and hence would
+        //count as a double of their next chunk.
+        if (iter->ptr == ptr && iter->size)
             return iter;
 
         iter = iter->next;
